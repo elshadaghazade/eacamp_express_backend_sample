@@ -1,5 +1,6 @@
 const express = require('express');
 const conn = require('./lib/mysql');
+const { contentSanitize } = require('./lib/sanitize');
 
 const app = express();
 
@@ -11,7 +12,7 @@ app.use(express.urlencoded({
 
 app.post('/telebe_yarat', async (req, res) => {
     const {ad, soyad} = req.body;
-    const netice = await conn.query(`insert into Students (name, surname, created_at) values ('${ad}', '${soyad}', now())`);
+    const netice = await conn.query(`insert into Students (name, surname, created_at) values (?, ?, now())`, [ad, soyad]);
 
     res.redirect('/telebelerin_siyahisi');
 });
@@ -27,29 +28,31 @@ app.get('/telebelerin_siyahisi', async (req, res) => {
 
     let totalCount = 0;
 
-    let novbetiHref = `<a href="?offset=${offset + 5}&axtar=${axtar}">sonrakı &raquo;</a>`;
+    let novbetiHref = `<a href="?offset=${offset + 5}&axtar=${axtar || ''}">sonrakı &raquo;</a>`;
     let evvelkiHref = '';
 
     if (offset - 5 >= 0) {
-        evvelkiHref = `<a href="?offset=${offset - 5}&axtar=${axtar}">&laquo; evvelki</a>`;
+        evvelkiHref = `<a href="?offset=${offset - 5}&axtar=${axtar || ''}">&laquo; evvelki</a>`;
     }
 
     const setrler = [];
+    let parameterler = [];
 
     let shert = '';
     if (axtar?.trim()) {
-        shert = `and (name like "%${axtar}%" or surname like "%${axtar}%")`;
+        shert = `and (name = ? or surname = ?)`;
+        parameterler = [axtar, axtar]
     }
 
     try {
-        const sql1 = `select * from Students where 1=1 ${shert} limit 5 offset ${offset}`;
+        const sql1 = `select * from Students where 1=1 ${shert} order by id desc limit 5 offset ${offset}`;
         const sql2 = `select count(*) as say from Students where 1=1 ${shert}`;
 
         console.log("sql1:", sql1);
         console.log("sql2:", sql2);
          
-        const [rows] = await conn.query(sql1);
-        const [counts] = await conn.query(sql2);
+        const [rows] = await conn.query(sql1, parameterler);
+        const [counts] = await conn.query(sql2, parameterler);
 
         totalCount = counts[0].say;
 
@@ -61,8 +64,8 @@ app.get('/telebelerin_siyahisi', async (req, res) => {
         for(let row of rows) {
             setrler.push(`<tr>
                 <td>${row.id}</td>
-                <td>${row.name}</td>
-                <td>${row.surname}</td>
+                <td>${contentSanitize(row.name)}</td>
+                <td>${contentSanitize(row.surname)}</td>
                 <td>${row.created_at.getHours()}:${row.created_at.getMinutes()}</td>
             </tr>`);
         }
