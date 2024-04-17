@@ -18,7 +18,7 @@ app.post('/telebe_yarat', async (req, res) => {
 
 
 app.get('/telebelerin_siyahisi', async (req, res) => {
-    let {offset} = req.query;
+    let {offset, axtar} = req.query;
     if (isNaN(offset)) {
         offset = 0;
     } else {
@@ -27,18 +27,29 @@ app.get('/telebelerin_siyahisi', async (req, res) => {
 
     let totalCount = 0;
 
-    let novbetiHref = `<a href="?offset=${offset + 5}">sonrakı &raquo;</a>`;
+    let novbetiHref = `<a href="?offset=${offset + 5}&axtar=${axtar}">sonrakı &raquo;</a>`;
     let evvelkiHref = '';
 
     if (offset - 5 >= 0) {
-        evvelkiHref = `<a href="?offset=${offset - 5}">&laquo; evvelki</a>`;
+        evvelkiHref = `<a href="?offset=${offset - 5}&axtar=${axtar}">&laquo; evvelki</a>`;
     }
 
     const setrler = [];
 
+    let shert = '';
+    if (axtar?.trim()) {
+        shert = `and (name like "%${axtar}%" or surname like "%${axtar}%")`;
+    }
+
     try {
-        const [rows] = await conn.query(`select * from Students limit 5 offset ${offset}`);
-        const [counts] = await conn.query(`select count(*) as say from Students`);
+        const sql1 = `select * from Students where 1=1 ${shert} limit 5 offset ${offset}`;
+        const sql2 = `select count(*) as say from Students where 1=1 ${shert}`;
+
+        console.log("sql1:", sql1);
+        console.log("sql2:", sql2);
+         
+        const [rows] = await conn.query(sql1);
+        const [counts] = await conn.query(sql2);
 
         totalCount = counts[0].say;
 
@@ -69,8 +80,9 @@ app.get('/telebelerin_siyahisi', async (req, res) => {
 </head>
 <body>
     <div>
+        <h1>Total count: ${totalCount}</h1>
         <form id="form" method="POST" action="/telebe_yarat">
-            <div>
+            <div style="margin: 20px auto;">
                 <div>
                     <label for="ad">Ad:</label>
                     <input type="text" id="ad" name="ad" />
@@ -81,6 +93,16 @@ app.get('/telebelerin_siyahisi', async (req, res) => {
                 </div>
                 <div>
                     <button>Gonder</button>
+                </div>
+            </div>
+        </form>
+
+        <form method="GET" action="">
+            <div style="margin: 20px auto">
+                <div>
+                    <label for="axtar">Axtar:</label>
+                    <input type="text" id="axtar" name="axtar" value="${axtar || ''}" />
+                    <button>Axtar</button>
                 </div>
             </div>
         </form>
